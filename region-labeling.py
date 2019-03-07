@@ -44,7 +44,7 @@ def printMatrix(M):
     lens = [max(map(len, col)) for col in zip(*s)]
     fmt = ''.join('{{:{}}}'.format(x) for x in lens)
     table = [fmt.format(*row) for row in s]
-    print '\n'.join(table)
+    print ('\n'.join(table))
     #print('\n'.join([''.join(['{:}'.format(item) for item in row]) for row in M]))
 
 def main():  
@@ -75,4 +75,4 @@ def main():
                 R[i][j] = 5
     printMatrix(R)
 if __name__ == '__main__':
-   main()"""
+   main()
