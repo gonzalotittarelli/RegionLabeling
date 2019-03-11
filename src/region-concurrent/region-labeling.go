@@ -11,6 +11,8 @@ const P = 5
 var image [][]int
 var label [][]int
 var result = make(chan bool)
+var first [P]chan [][]int
+var second [P]chan [][]int
 var answer [P]chan bool
 
 // Return the maximum value in an integer array.
@@ -44,43 +46,63 @@ func maxNeighbours(M [][]int, i int, j int) int {
 
 func worker(i int, length int, n int) {
 	stripSize := length / P
-	localimage := make([][]int, 2) //initialize the slice of slices
-    for i := range localimage {
-		localimage[i] = make([]int, n) // intialize every slice within the slice of slices
-    }
-	localimage = append(localimage[:1], append(image[(i * stripSize):((i * stripSize) + stripSize)], localimage[1:]...)...)
-	locallabel := make([][]int, 0)
-	//change := true
-	for i, row := range localimage {
-		tmp := make([]int, 0)
-		for j := range row {
-			value := 0
-			if localimage[i][j] == 1 {
-				value = i*n + j
-			}
-			tmp = append(tmp, value)
-		}
-		locallabel = append(locallabel, tmp)
+	localimage := make([][]int, 2) // local values plus edges
+	locallabel := make([][]int, 2) // from neighbors
+	for i := range localimage {
+		localimage[i] = make([]int, n)
+		locallabel[i] = make([]int, n)
 	}
-
-	/*for change {
-		change = False
-		for i in range(m):
-			n = len(M[i])
-			for j in range(n):
-				oldlabel = R[i][j]
-				if(M[i][j] == 1):
-					R[i][j] = maxNeighbours(R, i, j)
-				if(R[i][j] != oldlabel):
-					change = True
+	change := true
+	localimage = append(localimage[:1], append(image[(i*stripSize):((i*stripSize)+stripSize)], localimage[1:]...)...)
+	locallabel = append(locallabel[:1], append(label[(i*stripSize):((i*stripSize)+stripSize)], locallabel[1:]...)...)
+	// exchange edges of image with neighbors
+	if i != 1 {
+		first[i-1] <- localimage[1:2]
+	}
+	if i != P {
+		second[i+1] <- localimage[stripSize : stripSize+1]
+	}
+	if i != P {
+		var belowimage [][]int
+		belowimage = <-first[i]
+		localimage = append(localimage[:stripSize+1], append(belowimage, localimage[stripSize+1:]...)...)
+	}
+	if i != 1 {
+		var aboveimage [][]int
+		aboveimage = <-second[i]
+		localimage = append(localimage[:0], append(aboveimage, localimage[0:]...)...)
+	}
+	for change {
+		if i != 1 {
+			first[i-1] <- locallabel[1:2]
+		}
+		if i != P {
+			second[i+1] <- locallabel[stripSize : stripSize+1]
+		}
+		if i != P {
+			var belowimage [][]int
+			belowimage = <-first[i]
+			locallabel = append(locallabel[:stripSize+1], append(belowimage, locallabel[stripSize+1:]...)...)
+		}
+		if i != 1 {
+			var aboveimage [][]int
+			aboveimage = <-second[i]
+			locallabel = append(locallabel[:0], append(aboveimage, locallabel[0:]...)...)
+		}
+		for i := 1; i <= stripSize; i++ {
+			for j := 0; i < n; j++ {
+				oldlabel := locallabel[i][j]
+				if localimage[i][j] == 1 {
+					locallabel[i][j] = maxNeighbours(locallabel, i, j)
+				}
+				if locallabel[i][j] != oldlabel {
+					change = true
+				}
+			}
+		}
 		result <- change
 		change = <-answer[i]
-	}*/
-	fmt.Printf("worker %d", i)
-	fmt.Println("localimage")
-	printMatrix(localimage)
-	fmt.Println("locallabel")
-	printMatrix(locallabel)
+	}
 }
 
 func coordinator() {
@@ -179,8 +201,24 @@ func main() {
 		{1, 1, 0, 0},
 		{1, 1, 0, 0},
 	}
+	label = make([][]int, 0)
+	n := len(image[0])
+	for i, row := range image {
+		tmp := make([]int, 0)
+		for j := range row {
+			value := 0
+			if image[i][j] == 1 {
+				value = i*n + j
+			}
+			tmp = append(tmp, value)
+		}
+		label = append(label, tmp)
+	}
+
 	for i := range answer {
-		answer[i] = make(chan bool)
+		answer[i] = make(chan bool, 100)
+		first[i] = make(chan [][]int, 100)
+		second[i] = make(chan [][]int, 100)
 	}
 
 	go func() {
