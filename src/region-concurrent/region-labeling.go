@@ -1,20 +1,17 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
-	"os"
-	"strconv"
-	"strings"
 	"time"
 )
+
 const P = 5
+
 var image [][]int
 var label [][]int
 var result = make(chan bool)
-var answer [P] chan bool
-
+var answer [P]chan bool
 
 // Return the maximum value in an integer array.
 func max(arr []int) int {
@@ -45,21 +42,52 @@ func maxNeighbours(M [][]int, i int, j int) int {
 	return max(neighbour)
 }
 
-func worker(i, length int){
+func worker(i int, length int, n int) {
 	stripSize := length / P
-	
+	localimage := image[(i * stripSize):((i * stripSize) + stripSize)]
+	locallabel := make([][]int, 0)
 
+	//change := true
+	for i, row := range localimage {
+		tmp := make([]int, 0)
+		for j := range row {
+			value := 0
+			if localimage[i][j] == 1 {
+				value = i*n + j
+			}
+			tmp = append(tmp, value)
+		}
+		locallabel = append(locallabel, tmp)
+	}
+
+	/*for change {
+		change = False
+		for i in range(m):
+			n = len(M[i])
+			for j in range(n):
+				oldlabel = R[i][j]
+				if(M[i][j] == 1):
+					R[i][j] = maxNeighbours(R, i, j)
+				if(R[i][j] != oldlabel):
+					change = True
+		result <- change
+		change = <-answer[i]
+	}*/
+	fmt.Printf("worker %d", i)
+	fmt.Println()
+	printMatrix(localimage)
+	printMatrix(locallabel)
 }
 
 func coordinator() {
 	chg, change := true, true
 	for change {
 		change = false
-		for i:=0; i<= P; i++{
-			chg = <- result
+		for i := 0; i <= P; i++ {
+			chg = <-result
 			change = (change || chg)
 		}
-		for i:=0; i< P; i++{
+		for i := 0; i < P; i++ {
 			answer[i] <- change
 		}
 	}
@@ -115,7 +143,7 @@ func printMatrix(M [][]int) {
 }
 
 func main() {
-	file, err := os.Open(os.Args[1])
+	/*file, err := os.Open(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -134,23 +162,35 @@ func main() {
 			tmp = append(tmp, letter)
 		}
 		image = append(image, tmp)
+	}*/
+	image = [][]int{
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 1, 1, 0},
+		{0, 1, 1, 0},
+		{0, 0, 0, 0},
+		{0, 0, 1, 1},
+		{0, 0, 1, 1},
+		{0, 0, 0, 0},
+		{1, 1, 0, 0},
+		{1, 1, 0, 0},
 	}
-	
 	for i := range answer {
 		answer[i] = make(chan bool)
 	}
 
 	go func() {
-		for i:=0; i< P; i++{
-			worker(i, len(image))
-		} 
-	}();
+		for i := 0; i < P; i++ {
+			worker(i, len(image), len(image[0]))
+		}
+	}()
 
-	coordinator()
+	time.Sleep(3000 * time.Millisecond)
+	//coordinator()
 
 	//regionLabeling(matrix)
 
-	if err := scanner.Err(); err != nil {
+	/*if err := scanner.Err(); err != nil {
 		log.Fatal(err)
-	}
+	}*/
 }
