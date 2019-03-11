@@ -44,9 +44,12 @@ func maxNeighbours(M [][]int, i int, j int) int {
 
 func worker(i int, length int, n int) {
 	stripSize := length / P
-	localimage := image[(i * stripSize):((i * stripSize) + stripSize)]
+	localimage := make([][]int, 2) //initialize the slice of slices
+    for i := range localimage {
+		localimage[i] = make([]int, n) // intialize every slice within the slice of slices
+    }
+	localimage = append(localimage[:1], append(image[(i * stripSize):((i * stripSize) + stripSize)], localimage[1:]...)...)
 	locallabel := make([][]int, 0)
-
 	//change := true
 	for i, row := range localimage {
 		tmp := make([]int, 0)
@@ -74,8 +77,9 @@ func worker(i int, length int, n int) {
 		change = <-answer[i]
 	}*/
 	fmt.Printf("worker %d", i)
-	fmt.Println()
+	fmt.Println("localimage")
 	printMatrix(localimage)
+	fmt.Println("locallabel")
 	printMatrix(locallabel)
 }
 
@@ -133,7 +137,7 @@ func printMatrix(M [][]int) {
 	for i, row := range M {
 		for j := range row {
 			if M[i][j] > 0 {
-				fmt.Print("*")
+				fmt.Print(M[i][j])
 			} else {
 				fmt.Print(0)
 			}
