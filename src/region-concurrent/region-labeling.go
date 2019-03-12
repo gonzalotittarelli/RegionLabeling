@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	//"log"
 	"time"
 )
 
@@ -44,7 +44,13 @@ func maxNeighbours(M [][]int, i int, j int) int {
 	return max(neighbour)
 }
 
-func worker(i int, length int, n int) {
+func replace(i int, matrix [][]int, value [][]int) [][]int {
+	matrix = append(matrix[:i], matrix[i+1:]...)
+	matrix = append(matrix[:i], append(value, matrix[i:]...)...)
+	return matrix
+}
+
+func worker(i int, length int, n int) {	
 	stripSize := length / P
 	localimage := make([][]int, 2) // local values plus edges
 	locallabel := make([][]int, 2) // from neighbors
@@ -56,41 +62,46 @@ func worker(i int, length int, n int) {
 	localimage = append(localimage[:1], append(image[(i*stripSize):((i*stripSize)+stripSize)], localimage[1:]...)...)
 	locallabel = append(locallabel[:1], append(label[(i*stripSize):((i*stripSize)+stripSize)], locallabel[1:]...)...)
 	// exchange edges of image with neighbors
-	if i != 1 {
+	if i != 0 {
 		first[i-1] <- localimage[1:2]
-	}
-	if i != P {
+	}	
+	if i != P-1 {
 		second[i+1] <- localimage[stripSize : stripSize+1]
 	}
-	if i != P {
+	if i != P-1 {
 		var belowimage [][]int
 		belowimage = <-first[i]
-		localimage = append(localimage[:stripSize+1], append(belowimage, localimage[stripSize+1:]...)...)
+		//localimage = append(localimage[:stripSize], append(belowimage, localimage[stripSize:]...)...)
+		localimage = replace(stripSize, localimage, belowimage)
 	}
-	if i != 1 {
+	if i != 0 {
 		var aboveimage [][]int
 		aboveimage = <-second[i]
-		localimage = append(localimage[:0], append(aboveimage, localimage[0:]...)...)
-	}
+		//localimage = append(localimage[:0], append(aboveimage, localimage[0:]...)...)
+		localimage = replace(0, localimage, aboveimage)
+	}	
 	for change {
-		if i != 1 {
+		change = false
+		if i != 0 {
 			first[i-1] <- locallabel[1:2]
 		}
-		if i != P {
+		if i != P-1 {
 			second[i+1] <- locallabel[stripSize : stripSize+1]
 		}
-		if i != P {
+		if i != P-1 {
 			var belowimage [][]int
 			belowimage = <-first[i]
-			locallabel = append(locallabel[:stripSize+1], append(belowimage, locallabel[stripSize+1:]...)...)
+			//locallabel = append(locallabel[:stripSize], append(belowimage, locallabel[stripSize:]...)...)
+			locallabel = replace(stripSize, locallabel, belowimage)
 		}
-		if i != 1 {
+		if i != 0 {
 			var aboveimage [][]int
 			aboveimage = <-second[i]
-			locallabel = append(locallabel[:0], append(aboveimage, locallabel[0:]...)...)
+			//locallabel = append(locallabel[:0], append(aboveimage, locallabel[0:]...)...)
+			locallabel = replace(0, locallabel, aboveimage)			
 		}
 		for i := 1; i <= stripSize; i++ {
-			for j := 0; i < n; j++ {
+			for j := 0; j < n; j++ {
 				oldlabel := locallabel[i][j]
 				if localimage[i][j] == 1 {
 					locallabel[i][j] = maxNeighbours(locallabel, i, j)
@@ -103,13 +114,14 @@ func worker(i int, length int, n int) {
 		result <- change
 		change = <-answer[i]
 	}
+	fmt.Println(locallabel)
 }
 
 func coordinator() {
 	chg, change := true, true
 	for change {
 		change = false
-		for i := 0; i <= P; i++ {
+		for i := 0; i < P; i++ {
 			chg = <-result
 			change = (change || chg)
 		}
@@ -117,42 +129,6 @@ func coordinator() {
 			answer[i] <- change
 		}
 	}
-}
-
-func regionLabeling(M [][]int) [][]int {
-	start := time.Now()
-	R := make([][]int, 0)
-	n := len(M[0])
-	for i, row := range M {
-		tmp := make([]int, 0)
-		for j := range row {
-			value := 0
-			if M[i][j] == 1 {
-				value = i*n + j
-			}
-			tmp = append(tmp, value)
-		}
-		R = append(R, tmp)
-	}
-	for {
-		change := false
-		for i, row := range M {
-			for j := range row {
-				oldlabel := R[i][j]
-				if M[i][j] == 1 {
-					R[i][j] = maxNeighbours(R, i, j)
-				}
-				if R[i][j] != oldlabel {
-					change = true
-				}
-			}
-		}
-		if !change {
-			break
-		}
-	}
-	log.Printf("--- %s seconds ---", (time.Since(start)))
-	return R
 }
 
 func printMatrix(M [][]int) {
@@ -194,11 +170,11 @@ func main() {
 		{0, 0, 0, 0},
 		{0, 1, 1, 0},
 		{0, 1, 1, 0},
-		{0, 0, 0, 0},
+		{0, 0, 1, 0},
 		{0, 0, 1, 1},
 		{0, 0, 1, 1},
-		{0, 0, 0, 0},
-		{1, 1, 0, 0},
+		{0, 0, 1, 0},
+		{1, 1, 1, 0},
 		{1, 1, 0, 0},
 	}
 	label = make([][]int, 0)
@@ -221,17 +197,12 @@ func main() {
 		second[i] = make(chan [][]int, 100)
 	}
 
-	go func() {
-		for i := 0; i < P; i++ {
-			worker(i, len(image), len(image[0]))
-		}
-	}()
-
-	time.Sleep(3000 * time.Millisecond)
-	//coordinator()
-
-	//regionLabeling(matrix)
-
+	for i := 0; i < P; i++ {
+		go worker(i, len(image), len(image[0]))
+	}
+	
+	coordinator()	
+	time.Sleep(3 * time.Second)
 	/*if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}*/
