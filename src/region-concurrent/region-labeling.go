@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	//"log"
-	"time"
+	"sync"
 )
 
-const P = 5
+const P = 3
 
 var image [][]int
 var label [][]int
@@ -45,12 +45,13 @@ func maxNeighbours(M [][]int, i int, j int) int {
 }
 
 func replace(i int, matrix [][]int, value [][]int) [][]int {
-	matrix = append(matrix[:i], matrix[i+1:]...)
+	//matrix = append(matrix[:i], matrix[i+1:]...)
+	matrix = matrix[:i+copy(matrix[i:], matrix[i+1:])]
 	matrix = append(matrix[:i], append(value, matrix[i:]...)...)
 	return matrix
 }
 
-func worker(i int, length int, n int) {	
+func worker(i int, length int, n int, wg *sync.WaitGroup) {
 	stripSize := length / P
 	localimage := make([][]int, 2) // local values plus edges
 	locallabel := make([][]int, 2) // from neighbors
@@ -64,22 +65,20 @@ func worker(i int, length int, n int) {
 	// exchange edges of image with neighbors
 	if i != 0 {
 		first[i-1] <- localimage[1:2]
-	}	
+	}
 	if i != P-1 {
 		second[i+1] <- localimage[stripSize : stripSize+1]
 	}
 	if i != P-1 {
 		var belowimage [][]int
 		belowimage = <-first[i]
-		//localimage = append(localimage[:stripSize], append(belowimage, localimage[stripSize:]...)...)
 		localimage = replace(stripSize, localimage, belowimage)
 	}
 	if i != 0 {
 		var aboveimage [][]int
 		aboveimage = <-second[i]
-		//localimage = append(localimage[:0], append(aboveimage, localimage[0:]...)...)
 		localimage = replace(0, localimage, aboveimage)
-	}	
+	}
 	for change {
 		change = false
 		if i != 0 {
@@ -91,14 +90,12 @@ func worker(i int, length int, n int) {
 		if i != P-1 {
 			var belowimage [][]int
 			belowimage = <-first[i]
-			//locallabel = append(locallabel[:stripSize], append(belowimage, locallabel[stripSize:]...)...)
 			locallabel = replace(stripSize, locallabel, belowimage)
 		}
 		if i != 0 {
 			var aboveimage [][]int
 			aboveimage = <-second[i]
-			//locallabel = append(locallabel[:0], append(aboveimage, locallabel[0:]...)...)
-			locallabel = replace(0, locallabel, aboveimage)			
+			locallabel = replace(0, locallabel, aboveimage)
 		}
 		for i := 1; i <= stripSize; i++ {
 			for j := 0; j < n; j++ {
@@ -115,6 +112,7 @@ func worker(i int, length int, n int) {
 		change = <-answer[i]
 	}
 	fmt.Println(locallabel)
+	wg.Done()
 }
 
 func coordinator() {
@@ -172,10 +170,6 @@ func main() {
 		{0, 1, 1, 0},
 		{0, 0, 1, 0},
 		{0, 0, 1, 1},
-		{0, 0, 1, 1},
-		{0, 0, 1, 0},
-		{1, 1, 1, 0},
-		{1, 1, 0, 0},
 	}
 	label = make([][]int, 0)
 	n := len(image[0])
@@ -192,17 +186,17 @@ func main() {
 	}
 
 	for i := range answer {
-		answer[i] = make(chan bool, 100)
+		answer[i] = make(chan bool)
 		first[i] = make(chan [][]int, 100)
 		second[i] = make(chan [][]int, 100)
 	}
-
+	var wg sync.WaitGroup
 	for i := 0; i < P; i++ {
-		go worker(i, len(image), len(image[0]))
+		wg.Add(1)
+		go worker(i, len(image), len(image[0]), &wg)
 	}
-	
-	coordinator()	
-	time.Sleep(3 * time.Second)
+	coordinator()
+	wg.Wait()
 	/*if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}*/
