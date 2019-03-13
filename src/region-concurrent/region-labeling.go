@@ -1,12 +1,17 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	//"log"
+	"log"
 	"sync"
+	"os"
+	"strconv"
+	"strings"
+	"time"
 )
 
-const P = 3
+const P = 810
 
 var image [][]int
 var label [][]int
@@ -14,6 +19,7 @@ var result = make(chan bool)
 var first [P]chan [][]int
 var second [P]chan [][]int
 var answer [P]chan bool
+var cresult [P]chan [][]int
 
 // Return the maximum value in an integer array.
 func max(arr []int) int {
@@ -51,7 +57,7 @@ func replace(i int, matrix [][]int, value [][]int) [][]int {
 	return matrix
 }
 
-func worker(i int, length int, n int, wg *sync.WaitGroup) {
+func worker(w int, length int, n int, wg *sync.WaitGroup) {
 	stripSize := length / P
 	localimage := make([][]int, 2) // local values plus edges
 	locallabel := make([][]int, 2) // from neighbors
@@ -60,41 +66,53 @@ func worker(i int, length int, n int, wg *sync.WaitGroup) {
 		locallabel[i] = make([]int, n)
 	}
 	change := true
-	localimage = append(localimage[:1], append(image[(i*stripSize):((i*stripSize)+stripSize)], localimage[1:]...)...)
-	locallabel = append(locallabel[:1], append(label[(i*stripSize):((i*stripSize)+stripSize)], locallabel[1:]...)...)
+	limage := make([][]int, len(image[(w*stripSize):((w*stripSize)+stripSize)]))
+	copy(limage, image[(w*stripSize):((w*stripSize)+stripSize)])
+	llabel := make([][]int, len(label[(w*stripSize):((w*stripSize)+stripSize)]))
+	copy(llabel, label[(w*stripSize):((w*stripSize)+stripSize)])
+	localimage = append(localimage[:1], append(limage, localimage[1:]...)...)
+	locallabel = append(locallabel[:1], append(llabel, locallabel[1:]...)...)
 	// exchange edges of image with neighbors
-	if i != 0 {
-		first[i-1] <- localimage[1:2]
+	if w != 0 {
+		f := make([][]int, len(localimage[1:2]))
+		copy(f, localimage[1:2])
+		first[w-1] <- f
 	}
-	if i != P-1 {
-		second[i+1] <- localimage[stripSize : stripSize+1]
+	if w != P-1 {
+		s := make([][]int, len(localimage[stripSize : stripSize+1]))
+		copy(s, localimage[stripSize : stripSize+1])
+		second[w+1] <- s
 	}
-	if i != P-1 {
+	if w != P-1 {
 		var belowimage [][]int
-		belowimage = <-first[i]
-		localimage = replace(stripSize, localimage, belowimage)
+		belowimage = <-first[w]		
+		localimage = replace(stripSize+1, localimage, belowimage)
 	}
-	if i != 0 {
+	if w != 0 {
 		var aboveimage [][]int
-		aboveimage = <-second[i]
+		aboveimage = <-second[w]
 		localimage = replace(0, localimage, aboveimage)
 	}
 	for change {
 		change = false
-		if i != 0 {
-			first[i-1] <- locallabel[1:2]
+		if w != 0 {
+			f := make([][]int, len(locallabel[1:2]))
+			copy(f, locallabel[1:2])
+			first[w-1] <- f
 		}
-		if i != P-1 {
-			second[i+1] <- locallabel[stripSize : stripSize+1]
+		if w != P-1 {
+			s := make([][]int, len(locallabel[stripSize : stripSize+1]))
+			copy(s, locallabel[stripSize : stripSize+1])
+			second[w+1] <- s
 		}
-		if i != P-1 {
+		if w != P-1 {
 			var belowimage [][]int
-			belowimage = <-first[i]
-			locallabel = replace(stripSize, locallabel, belowimage)
+			belowimage = <-first[w]
+			locallabel = replace(stripSize+1, locallabel, belowimage)
 		}
-		if i != 0 {
+		if w != 0 {
 			var aboveimage [][]int
-			aboveimage = <-second[i]
+			aboveimage = <-second[w]
 			locallabel = replace(0, locallabel, aboveimage)
 		}
 		for i := 1; i <= stripSize; i++ {
@@ -109,9 +127,9 @@ func worker(i int, length int, n int, wg *sync.WaitGroup) {
 			}
 		}
 		result <- change
-		change = <-answer[i]
+		change = <-answer[w]
 	}
-	fmt.Println(locallabel)
+	cresult[w] <- locallabel[1:len(locallabel)-1]
 	wg.Done()
 }
 
@@ -127,13 +145,18 @@ func coordinator() {
 			answer[i] <- change
 		}
 	}
+	for i := 0; i < P; i++ {
+		<-cresult[i]
+		/*llabel := <-cresult[i]
+		printMatrix(llabel)*/
+	}
 }
 
 func printMatrix(M [][]int) {
 	for i, row := range M {
 		for j := range row {
 			if M[i][j] > 0 {
-				fmt.Print(M[i][j])
+				fmt.Print("*")
 			} else {
 				fmt.Print(0)
 			}
@@ -143,12 +166,13 @@ func printMatrix(M [][]int) {
 }
 
 func main() {
-	/*file, err := os.Open(os.Args[1])
+	
+	file, err := os.Open(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
-	image := make([][]int, 0)
+	image = make([][]int, 0)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		tmp := make([]int, 0)
@@ -162,14 +186,6 @@ func main() {
 			tmp = append(tmp, letter)
 		}
 		image = append(image, tmp)
-	}*/
-	image = [][]int{
-		{0, 0, 0, 0},
-		{0, 0, 0, 0},
-		{0, 1, 1, 0},
-		{0, 1, 1, 0},
-		{0, 0, 1, 0},
-		{0, 0, 1, 1},
 	}
 	label = make([][]int, 0)
 	n := len(image[0])
@@ -187,9 +203,11 @@ func main() {
 
 	for i := range answer {
 		answer[i] = make(chan bool)
-		first[i] = make(chan [][]int, 100)
-		second[i] = make(chan [][]int, 100)
+		first[i] = make(chan [][]int, 200)
+		second[i] = make(chan [][]int, 200)
+		cresult[i] = make(chan [][]int)
 	}
+	start := time.Now()
 	var wg sync.WaitGroup
 	for i := 0; i < P; i++ {
 		wg.Add(1)
@@ -197,7 +215,8 @@ func main() {
 	}
 	coordinator()
 	wg.Wait()
-	/*if err := scanner.Err(); err != nil {
+	log.Printf("--- %s seconds ---", (time.Since(start)))
+	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
-	}*/
+	}	
 }
