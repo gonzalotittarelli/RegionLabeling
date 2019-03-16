@@ -74,5 +74,6 @@ def main():
             if(R[i][j] > 0):
                 R[i][j] = 5
     printMatrix(R)
+    
 if __name__ == '__main__':
    main()
