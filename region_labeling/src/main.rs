@@ -3,75 +3,9 @@ use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::path::Path;
 use std::env;
-use std::fmt::{Display, Formatter, Error};
+//use std::fmt::{Display, Formatter, Error};
 
-struct NumVec(Vec<Vec<u32>>);
-
-impl Display for NumVec {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        let mut comma_separated = String::new();
-
-        for num in &self.0[0..self.0.len() - 1] {
-            for num2 in &num[0..num.len() - 1] {
-                comma_separated.push_str(&num2.to_string());
-            }            
-            comma_separated.push_str("\n")
-        }        
-        write!(f, "{}", comma_separated)
-    }
-}
-
-/*fn maxNeighbours<T0, T1, T2, RT>(M: T0, i: T1, j: T2) -> RT {
-    let mut neighbour = vec![];
-    if i > 0 {
-        neighbour.push(M[i - 1][j]);
-    }
-    if i < M.len() - 1 {
-        neighbour.push(M[i + 1][j]);
-    }
-    if j > 0 {
-        neighbour.push(M[i][j - 1]);
-    }
-    if j < M[i].len() - 1 {
-        neighbour.push(M[i][j + 1]);
-    }
-    return neighbour.iter().max().unwrap();
-}*/
-
-fn region_labeling(matrix : Vec<Vec<u32>>) -> Vec<Vec<u32>> {
-    let m : usize = matrix.len();
-    let n : usize = matrix[0].len();
-    let mut grid : Vec<Vec<u32>> = Vec::with_capacity(n * m);
-    for (i, row) in grid.iter_mut().enumerate() {
-        for (j, col) in row.iter_mut().enumerate() {
-            if matrix[i][j] == 1 {
-                let value = i as u32  * n as u32  + j as u32;
-                *col = value;
-            }
-        }
-    }
-    /*while true {
-        let mut change = false;
-        for i in 0..m {
-            n = M[i].len();
-            for j in 0..n {
-                let oldlabel = R[i][j];
-                if M[i][j] == 1 {
-                    R[i][j] = maxNeighbours(R, i, j);
-                }
-                if R[i][j] != oldlabel {
-                    change = true;
-                }
-            }
-        }
-        if !change {
-            break;
-        }
-    }*/
-    grid
-}
-
-
+const RADIX: u32 = 10;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -87,33 +21,100 @@ fn main() {
         // describes the error
         Err(_) => panic!("couldn't open {}", display),
         Ok(file) => file,
-    };
-    const RADIX: u32 = 10;
+    };    
     let buffered = BufReader::new(file);
     let mut matrix : Vec<Vec<u32>> = Vec::new();
     for (_, line) in buffered.lines().enumerate() {
         let l = line.unwrap();
         let mut row : Vec<u32> = Vec::new();
-        //let mut row = vec![];
-        for (_, c) in l.chars().map(|c| c.to_digit(RADIX).unwrap()).skip(1).enumerate() {
+        for (_, c) in l.chars().map(|c| c.to_digit(RADIX).unwrap()).enumerate() {
             row.push(c);
         }
         matrix.push(row);
     }
 
-    let v = region_labeling(matrix);
-    
-
-    println!("{}", v.len());
-
-    /*for (_, row) in matrix.iter().enumerate() {
-        for (_, col) in row.iter().enumerate() {
-            print!("{:?}", col);
+    let m = matrix.len();
+    let n = matrix[0].len();
+    let grid = &mut vec![vec![0; n]; m];
+    for (i, row) in grid.iter_mut().enumerate() {
+        for (j, col) in row.iter_mut().enumerate() {
+            if matrix[i][j] == 1 {
+                let value = i as u32  * n as u32  + j as u32;
+                *col = value;
+            }
         }
-        println!()
-    }*/
-    //print!("{:?}", matrix[0])
+    }
 
-    /*let R = regionLabeling(M);
-    */
+    region_labeling(matrix, m, n, grid);
+    
+    print_matrix(grid)
+}
+
+/*struct NumVec(Vec<Vec<u32>>);
+
+impl Display for NumVec {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        let mut comma_separated = String::new();
+
+        for num in &self.0[0..self.0.len() - 1] {
+            for num2 in &num[0..num.len() - 1] {
+                comma_separated.push_str(&num2.to_string());
+            }            
+            comma_separated.push_str("\n")
+        }        
+        write!(f, "{}", comma_separated)
+    }
+}*/
+
+fn print_matrix(matrix: &Vec<Vec<u32>>) {
+    let mut comma_separated = String::new();
+
+    for row in &matrix[0..matrix.len()] {
+        for col in &row[0..row.len()] {
+            if *col > 0 {
+                comma_separated.push_str("*");
+            }else{
+                comma_separated.push_str(&col.to_string());
+            }
+        }
+        comma_separated.push_str("\n")
+    }        
+    println!("{}", comma_separated);
+}
+
+fn max_neighbours(matrix: &Vec<Vec<u32>>, i: usize, j: usize) -> u32 {
+    let mut neighbour : Vec<u32> = vec![];
+    if i > 0 {
+        neighbour.push(matrix[i - 1][j]);
+    }
+    if i < matrix.len() - 1 {
+        neighbour.push(matrix[i + 1][j]);
+    }
+    if j > 0 {
+        neighbour.push(matrix[i][j - 1]);
+    }
+    if j < matrix[i].len() - 1 {
+        neighbour.push(matrix[i][j + 1]);
+    }
+    return *neighbour.iter().max().unwrap();
+}
+
+fn region_labeling(matrix : Vec<Vec<u32>>, m : usize, n : usize, g : &mut Vec<Vec<u32>>) {    
+    loop {
+        let mut change = false;
+        for i in 0..m {
+            for j in 0..n{
+                let oldlabel = g[i][j];
+                if matrix[i][j] == 1 {
+                    g[i][j] = max_neighbours(g, i, j);                    
+                }
+                if g[i][j] != oldlabel {
+                    change = true;
+                }             
+            }            
+        }
+        if !change {
+            break;
+        }
+    }
 }
