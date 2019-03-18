@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::path::Path;
 use std::env;
+use std::time::{Instant};
 //use std::fmt::{Display, Formatter, Error};
 
 const RADIX: u32 = 10;
@@ -23,12 +24,13 @@ fn main() {
         Ok(file) => file,
     };    
     let buffered = BufReader::new(file);
-    let mut matrix : Vec<Vec<u32>> = Vec::new();
+    let mut matrix : Vec<Vec<u64>> = Vec::new();
     for (_, line) in buffered.lines().enumerate() {
         let l = line.unwrap();
-        let mut row : Vec<u32> = Vec::new();
+        let mut row : Vec<u64> = Vec::new();
         for (_, c) in l.chars().map(|c| c.to_digit(RADIX).unwrap()).enumerate() {
-            row.push(c);
+            let value = c as u64;
+            row.push(value);
         }
         matrix.push(row);
     }
@@ -39,15 +41,18 @@ fn main() {
     for (i, row) in grid.iter_mut().enumerate() {
         for (j, col) in row.iter_mut().enumerate() {
             if matrix[i][j] == 1 {
-                let value = i as u32  * n as u32  + j as u32;
+                let value = i as u64  * n as u64  + j as u64;
                 *col = value;
             }
         }
     }
-
+    let start = Instant::now();
     region_labeling(matrix, m, n, grid);
+    let duration = start.elapsed();
+
+    println!("Time elapsed in expensive_function() is: {:?}", duration);    
     
-    print_matrix(grid)
+    //print_matrix(grid)
 }
 
 /*struct NumVec(Vec<Vec<u32>>);
@@ -66,7 +71,7 @@ impl Display for NumVec {
     }
 }*/
 
-fn print_matrix(matrix: &Vec<Vec<u32>>) {
+fn print_matrix(matrix: &Vec<Vec<u64>>) {
     let mut comma_separated = String::new();
 
     for row in &matrix[0..matrix.len()] {
@@ -82,8 +87,8 @@ fn print_matrix(matrix: &Vec<Vec<u32>>) {
     println!("{}", comma_separated);
 }
 
-fn max_neighbours(matrix: &Vec<Vec<u32>>, i: usize, j: usize) -> u32 {
-    let mut neighbour : Vec<u32> = vec![];
+fn max_neighbours(matrix: &Vec<Vec<u64>>, i: usize, j: usize) -> u64 {
+    let mut neighbour : Vec<u64> = vec![];
     if i > 0 {
         neighbour.push(matrix[i - 1][j]);
     }
@@ -99,7 +104,7 @@ fn max_neighbours(matrix: &Vec<Vec<u32>>, i: usize, j: usize) -> u32 {
     return *neighbour.iter().max().unwrap();
 }
 
-fn region_labeling(matrix : Vec<Vec<u32>>, m : usize, n : usize, g : &mut Vec<Vec<u32>>) {    
+fn region_labeling(matrix : Vec<Vec<u64>>, m : usize, n : usize, g : &mut Vec<Vec<u64>>) {    
     loop {
         let mut change = false;
         for i in 0..m {
