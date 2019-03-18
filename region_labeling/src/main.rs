@@ -24,12 +24,12 @@ fn main() {
         Ok(file) => file,
     };    
     let buffered = BufReader::new(file);
-    let mut matrix : Vec<Vec<u64>> = Vec::new();
+    let mut matrix : Vec<Vec<u8>> = Vec::new();
     for (_, line) in buffered.lines().enumerate() {
         let l = line.unwrap();
-        let mut row : Vec<u64> = Vec::new();
+        let mut row : Vec<u8> = Vec::new();
         for (_, c) in l.chars().map(|c| c.to_digit(RADIX).unwrap()).enumerate() {
-            let value = c as u64;
+            let value = c as u8;
             row.push(value);
         }
         matrix.push(row);
@@ -104,7 +104,7 @@ fn max_neighbours(matrix: &Vec<Vec<u64>>, i: usize, j: usize) -> u64 {
     return *neighbour.iter().max().unwrap();
 }
 
-fn region_labeling(matrix : Vec<Vec<u64>>, m : usize, n : usize, g : &mut Vec<Vec<u64>>) {    
+fn region_labeling(matrix : Vec<Vec<u8>>, m : usize, n : usize, g : &mut Vec<Vec<u64>>) {    
     loop {
         let mut change = false;
         for i in 0..m {
