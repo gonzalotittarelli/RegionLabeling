@@ -5,6 +5,8 @@ authors = ["gonzalotittarelli <gonzalotittarelli@hotmail.com>"]
 edition = "2018"
 
 [dependencies]
+crossbeam = "0.7"
+crossbeam-channel = "0.3"
 
 [profile.dev]
 opt-level = 3
